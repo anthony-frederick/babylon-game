@@ -4,50 +4,34 @@ import {
   FreeCamera,
   HemisphericLight,
   Vector3,
-  MeshBuilder,
   Quaternion,
+  MeshBuilder,
   StandardMaterial,
   Color3,
-  Color4
+  Color4,
+  DefaultRenderingPipeline
 } from "@babylonjs/core";
 
-import "./style.css";
-import {Inspector} from "@babylonjs/inspector";
-import {Viewer} from "@babylonjs/viewer"
 import "@babylonjs/loaders";
-import {SceneLoader} from "@babylonjs/core/Loading/sceneLoader";
-import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
+
+import "./style.css";
 
 
-// CANVAS AND ENGINE
+// CANVAS + ENGINE
 
 const canvas = document.getElementById("renderCanvas");
+
 const engine = new Engine(canvas, true);
 
 // SCENE
 
 const scene = new Scene(engine);
+
+// Black space background
 scene.clearColor = new Color4(0, 0, 0, 1);
 
-// DEV HOTKEYS
 
-window.addEventListener("keydown", (event) => {
-  if (event.key === "0") {
-    Inspector.Show(scene, {
-      embedMode: true
-    });
-  }
-});
-
-window.addEventListener("keydown", (event) => {
-  if (event.key === "9") {
-    Viewer.Show(scene, {
-      embedMode: true
-    });
-  }
-});
-
-// FIRST-PERSON CAMERA
+// CAMERA
 
 const camera = new FreeCamera(
   "camera",
@@ -57,23 +41,9 @@ const camera = new FreeCamera(
 
 camera.attachControl(canvas, true);
 
-// No movement for the camera because player is at the center
+// Keep the player in the center
 camera.speed = 0;
 
-// LIGHTING BLOOM
-
-const pipeline = new DefaultRenderingPipeline(
-  "defaultPipeline",
-  true,
-  scene,
-  [camera]
-);
-
-pipeline.bloomEnabled = true;
-pipeline.bloomThreshold = 0.8; // How bright something needs to be before bloom (0-2+)
-pipeline.bloomWeight = 0.3; // How strong the glow is (0-1)
-pipeline.bloomKernel = 64; // The size and spread of the glow (Powers of 2)
-pipeline.bloomScale = 0.1 // Resolution of the bloom (0-1)
 
 // LIGHT
 
@@ -83,7 +53,8 @@ const light = new HemisphericLight(
   scene
 );
 
-light.intensity = 1;
+light.intensity = 0.5;
+
 
 // SPHERICAL ARENA
 
@@ -95,111 +66,136 @@ const arena = MeshBuilder.CreateSphere(
     diameter: arenaRadius * 2,
     segments: 32
   },
-  scene);
+  scene
+);
 
-// Make the sphere a wireframe
 const arenaMaterial = new StandardMaterial(
   "arenaMaterial",
   scene
 );
 
-arenaMaterial.wireframe = true;
-arenaMaterial.alpha = 0.15;
+// STAR FIELD
 
-arena.material = arenaMaterial;
+const starCount = 300;
+const starDistance = arenaRadius * 0.9;
 
-// SHOOTING
+const starMaterial = new StandardMaterial(
+  "starMaterial",
+  scene
+);
 
-// How fast the bullets travel
-const bulletSpeed = 1;
+starMaterial.diffuseColor = new Color3(1, 1, 1);
+starMaterial.emissiveColor = new Color3(1, 1, 1);
 
-// How long bullets stay alive
-const bulletLifetime = 300;
+for (let i = 0; i < starCount; i++) {
 
-// Store all active bullets
+  // Random direction on a sphere
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(
+    2 * Math.random() - 1
+  );
+
+  const x =
+    Math.sin(phi) *
+    Math.cos(theta);
+
+  const y =
+    Math.cos(phi);
+
+  const z =
+    Math.sin(phi) *
+    Math.sin(theta);
+
+  const star = MeshBuilder.CreateSphere(
+    "star",
+    {
+      diameter: 0.08
+    },
+    scene
+  );
+
+  star.position = new Vector3(
+    x * starDistance,
+    y * starDistance,
+    z * starDistance
+  );
+
+  star.material = starMaterial;
+}
+
+
+// BLOOM / GLOW
+
+const pipeline = new DefaultRenderingPipeline(
+  "defaultPipeline",
+  true,
+  scene,
+  [camera]
+);
+
+pipeline.bloomEnabled = true;
+pipeline.bloomThreshold = 0.8;
+pipeline.bloomWeight = 0.5;
+pipeline.bloomKernel = 64;
+pipeline.bloomScale = 0.5;
+
+
+// BULLET SETTINGS
+
+const bulletSpeed = 20;
+const bulletLifetime = 5;
+
 const bullets = [];
 
-// CREATE A BULLET
+
+// SHOOT
+
 
 function shoot() {
+  const direction = camera
+    .getDirection(Vector3.Forward())
+    .normalize();
+
   const bullet = MeshBuilder.CreateCylinder(
     "bullet",
     {
-      height: 0.8,
-      diameter: 0.15,
+      height: 1.2,
+      diameter: 0.18,
       tessellation: 12
     },
     scene
   );
 
-  // Get the direction the camera is looking
-  const direction = camera
-    .getDirection(Vector3.Forward())
-    .normalize();
-
-  // Put the bullet in front of the camera
+  // Spawn in front of camera
   bullet.position = camera.position.add(
-    direction.scale(1)
+    direction.scale(2)
   );
 
-  // Make the cylinder point in the direction we're looking
-  bullet.rotationQuaternion =
-    Quaternion.FromUnitVectors(
-      Vector3.Up(),
-      direction
-    );
+  // Point cylinder in direction of camera
+  bullet.alignWithNormal(direction);
 
-  // Make the bullet glow
   const material = new StandardMaterial(
     "bulletMaterial",
     scene
   );
 
-  material.diffuseColor = new Color3(1, 0.1, 0.1);
-  material.emissiveColor = new Color3(1, 0.1, 0.1);
+  material.diffuseColor = new Color3(1, 0, 0);
+  material.emissiveColor = new Color3(1, 0, 0);
 
   bullet.material = material;
 
-  // Store movement information
   bullet.direction = direction;
   bullet.life = bulletLifetime;
 
   bullets.push(bullet);
 }
 
-  // Put the bullet slightly in front of the camera
-  bullet.position = camera.position.add(
-    camera.getDirection(Vector3.Forward()).scale(1)
-  );
-
-  // Give the bullet a material
-  const material = new StandardMaterial(
-    "bulletMaterial",
-    scene
-  );
-
-  material.diffuseColor = new Color3(1, 0.01, 0.01);
-  material.emissiveColor = new Color3(1, 0.01, 0.01);
-
-  bullet.material = material;
-
-  // Direction the player is looking
-  bullet.direction = camera.getDirection(
-    Vector3.Forward()
-  ).normalize();
-
-  // Lifetime counter
-  bullet.life = bulletLifetime;
-
-  // Add bullet to our list
-  bullets.push(bullet);
-
 
 // CLICK TO SHOOT
 
 canvas.addEventListener("click", () => {
 
-  // Lock the mouse to the game
+  // Lock mouse to the game
   if (document.pointerLockElement !== canvas) {
     canvas.requestPointerLock();
   }
@@ -207,27 +203,26 @@ canvas.addEventListener("click", () => {
   shoot();
 });
 
-// UPDATE BULLETS
+
+// BULLET MOVEMENT
 
 scene.onBeforeRenderObservable.add(() => {
+  const deltaTime = engine.getDeltaTime() / 1000;
 
   for (let i = bullets.length - 1; i >= 0; i--) {
-
     const bullet = bullets[i];
 
-    // Move the bullet forward
+    // Move the bullet
     bullet.position.addInPlace(
-      bullet.direction.scale(bulletSpeed)
+      bullet.direction.scale(20 * deltaTime)
     );
 
-    // Reduce lifetime
-    bullet.life--;
+    // Count down lifetime
+    bullet.life -= deltaTime;
 
-    // Delete old bullets
+    // Delete after 2 seconds
     if (bullet.life <= 0) {
-
       bullet.dispose();
-
       bullets.splice(i, 1);
     }
   }
