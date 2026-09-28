@@ -31,6 +31,25 @@ const scene = new Scene(engine);
 scene.clearColor = new Color4(0, 0, 0, 1);
 
 
+// DEV HOTKEYS
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "0") {
+    Inspector.Show(scene, {
+      embedMode: true
+    });
+  }
+});
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "9") {
+    Viewer.Show(scene, {
+      embedMode: true
+    });
+  }
+});
+
+
 // CAMERA
 
 const camera = new FreeCamera(
