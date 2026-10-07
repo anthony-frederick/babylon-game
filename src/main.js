@@ -8,13 +8,22 @@ import {
   StandardMaterial,
   Color3,
   Color4,
-  DefaultRenderingPipeline
+  DefaultRenderingPipeline,
+  VertexBuffer,
+  Sound
 } from "@babylonjs/core";
+
+import {
+  AdvancedDynamicTexture,
+  Rectangle,
+  TextBlock,
+  Control
+} from "@babylonjs/gui";
 
 import "@babylonjs/loaders";
 import "./style.css";
-import {Inspector} from "@babylonjs/inspector";
-import {Viewer} from "@babylonjs/viewer"
+import { Inspector } from "@babylonjs/inspector";
+import { Viewer } from "@babylonjs/viewer";
 
 
 // CANVAS + ENGINE
@@ -52,39 +61,234 @@ camera.attachControl(
 
 camera.speed = 0;
 
-// LIGHT
 
-const light = new HemisphericLight(
-  "light",
-  new Vector3(0, 1, 0),
-  scene
+// PLAYER HEALTH
+
+
+let playerHealth = 100;
+
+const maxHealth = 100;
+
+const damageCooldown = 0.5;
+
+let damageTimer = 0;
+
+const reboundSoundCooldown = 0.15;
+let reboundSoundTimer = 0;
+
+
+// GAME STATE
+
+let gameOver = false;
+let playerWon = false;
+
+
+// GUI
+
+const gui =
+  AdvancedDynamicTexture.CreateFullscreenUI(
+    "UI"
+  );
+
+
+// HEALTH BAR BACKGROUND
+
+const healthBarBackground =
+  new Rectangle();
+
+healthBarBackground.width = "300px";
+healthBarBackground.height = "30px";
+healthBarBackground.cornerRadius = 5;
+healthBarBackground.color = "white";
+healthBarBackground.thickness = 2;
+healthBarBackground.background = "black";
+
+healthBarBackground.horizontalAlignment =
+  Control.HORIZONTAL_ALIGNMENT_CENTER;
+
+healthBarBackground.verticalAlignment =
+  Control.VERTICAL_ALIGNMENT_BOTTOM;
+
+healthBarBackground.top = "-40px";
+
+gui.addControl(
+  healthBarBackground
 );
 
-light.intensity = 0.5;
+// HEALTH BAR
 
+const healthBar =
+  new Rectangle();
+
+healthBar.width = "296px";
+healthBar.height = "26px";
+healthBar.cornerRadius = 4;
+healthBar.color = "transparent";
+healthBar.thickness = 0;
+healthBar.background = "red";
+
+healthBar.horizontalAlignment =
+  Control.HORIZONTAL_ALIGNMENT_LEFT;
+
+healthBar.verticalAlignment =
+  Control.VERTICAL_ALIGNMENT_CENTER;
+
+healthBar.left = "0px";
+
+healthBarBackground.addControl(
+  healthBar
+);
+
+// HEALTH TEXT
+
+const healthText =
+  new TextBlock();
+
+healthText.text =
+  "100 / 100";
+
+healthText.color =
+  "white";
+
+healthText.fontSize =
+  18;
+
+healthBarBackground.addControl(
+  healthText
+);
+
+
+// UPDATE HEALTH BAR
+
+function updateHealthBar() {
+
+  const healthPercent =
+    playerHealth / maxHealth;
+
+  healthBar.width =
+    `${296 * healthPercent}px`;
+
+  healthText.text =
+    `${Math.max(0, Math.ceil(playerHealth))} / ${maxHealth}`;
+}
+
+// GAME OVER TEXT
+
+const gameOverText =
+  new TextBlock();
+
+gameOverText.text =
+  "GAME OVER\n\nPress R to Retry";
+
+gameOverText.color =
+  "red";
+
+gameOverText.fontSize =
+  60;
+
+gameOverText.fontWeight =
+  "bold";
+
+gameOverText.textHorizontalAlignment =
+  Control.HORIZONTAL_ALIGNMENT_CENTER;
+
+gameOverText.textVerticalAlignment =
+  Control.VERTICAL_ALIGNMENT_CENTER;
+
+gameOverText.textWrapping =
+  true;
+
+gameOverText.isVisible =
+  false;
+
+gui.addControl(
+  gameOverText
+);
+
+// YOU WIN TEXT
+
+const youWinText =
+  new TextBlock();
+
+youWinText.text =
+  "YOU WIN!\n\nPress R to Retry";
+
+youWinText.color =
+  "lime";
+
+youWinText.fontSize =
+  60;
+
+youWinText.fontWeight =
+  "bold";
+
+youWinText.textHorizontalAlignment =
+  Control.HORIZONTAL_ALIGNMENT_CENTER;
+
+youWinText.textVerticalAlignment =
+  Control.VERTICAL_ALIGNMENT_CENTER;
+
+youWinText.textWrapping =
+  true;
+
+youWinText.isVisible =
+  false;
+
+gui.addControl(
+  youWinText
+);
+
+// SOUNDS
+
+const shootSound = new Audio("sounds/shoot.wav");
+shootSound.volume = 0.5;
+const hitSound = new Audio("sounds/hit_Ship.mp3");
+hitSound.volume = 0.5;
+const loseSound = new Audio("sounds/lose.wav");
+loseSound.volume = 0.5;
+const splitSound = new Audio("sounds/split.wav");
+splitSound.volume = 0.5;
+const winSound = new Audio("sounds/win.wav");
+winSound.volume = 0.5;
+const reboundSound = new Audio("sounds/rebound.mp3");
+reboundSound.volume = 0.5;
+
+// LIGHT
+
+const light =
+  new HemisphericLight(
+    "light",
+    new Vector3(0, 1, 0),
+    scene
+  );
+
+light.intensity = 0.5;
 
 // SPHERICAL ARENA
 
 const arenaRadius = 50;
 
-const arena = MeshBuilder.CreateSphere(
-  "arena",
-  {
-    diameter: arenaRadius * 2,
-    segments: 32
-  },
-  scene
-);
+const arena =
+  MeshBuilder.CreateSphere(
+    "arena",
+    {
+      diameter: arenaRadius * 2,
+      segments: 32
+    },
+    scene
+  );
 
-const arenaMaterial = new StandardMaterial(
-  "arenaMaterial",
-  scene
-);
+const arenaMaterial =
+  new StandardMaterial(
+    "arenaMaterial",
+    scene
+  );
 
 arenaMaterial.alpha = 0;
 arenaMaterial.backFaceCulling = false;
 
-arena.material = arenaMaterial;
+arena.material =
+  arenaMaterial;
 
 // STARS
 
@@ -93,10 +297,11 @@ const starCount = 300;
 const starDistance =
   arenaRadius * 0.9;
 
-const starMaterial = new StandardMaterial(
-  "starMaterial",
-  scene
-);
+const starMaterial =
+  new StandardMaterial(
+    "starMaterial",
+    scene
+  );
 
 starMaterial.diffuseColor =
   new Color3(1, 1, 1);
@@ -105,7 +310,11 @@ starMaterial.emissiveColor =
   new Color3(1, 1, 1);
 
 
-for (let i = 0; i < starCount; i++) {
+for (
+  let i = 0;
+  i < starCount;
+  i++
+) {
 
   const theta =
     Math.random() * Math.PI * 2;
@@ -161,28 +370,45 @@ const pipeline =
 pipeline.bloomEnabled = true;
 pipeline.bloomThreshold = 0.8;
 pipeline.bloomWeight = 0.5;
-pipeline.bloomKernel = 64;
+pipeline.bloomKernel = 32;
 pipeline.bloomScale = 0.5;
+
 
 // DEV HOTKEYS
 
-window.addEventListener("keydown", (event) => {
-  if (event.key === "0") {
-    Inspector.Show(scene, {
-      embedMode: true
-    });
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+
+    if (event.key === "0") {
+
+      Inspector.Show(scene, {
+        embedMode: true
+      });
+
+    }
+
   }
- });
- 
+);
+
 // BULLET SETTINGS
 
 const bulletSpeed = 40;
 
 const bulletLifetime = 2;
 
+const maxBullets = 3;
+
+const shootCooldown = 0.5;
+
+let shootTimer = 0;
+
 const bullets = [];
 
+
 // METEOR SETTINGS
+
 
 const meteorCount = 10;
 
@@ -192,6 +418,9 @@ const meteorSpeedMax = 6;
 
 const meteors = [];
 
+const splitSoundCooldown = 0.6;
+let splitSoundTimer = 0;
+
 // METEOR MATERIAL
 
 const meteorMaterial =
@@ -200,11 +429,25 @@ const meteorMaterial =
     scene
   );
 
-meteorMaterial.diffuseColor =
+  meteorMaterial.diffuseColor =
   new Color3(
-    0.35,
-    0.35,
-    0.35
+    0.28,
+    0.22,
+    0.17
+  );
+
+meteorMaterial.emissiveColor =
+  new Color3(
+    0.12,
+    0.08,
+    0.05
+  );
+
+meteorMaterial.specularColor =
+  new Color3(
+    0.1,
+    0.1,
+    0.1
   );
 
 // CREATE METEOR
@@ -218,61 +461,141 @@ function createMeteor(
   let diameter;
 
 
-  // BIG
   if (size === "big") {
 
-    diameter = 4;
+    diameter = 5;
 
   }
-
-
-  // MEDIUM
   else if (size === "medium") {
 
-    diameter = 2.5;
+    diameter = 3.7;
 
   }
-
-
-  // SMALL
   else {
 
-    diameter = 1.3;
+    diameter = 2;
 
   }
 
-
   // CREATE SPHERE
+
   const meteor =
     MeshBuilder.CreateSphere(
       "meteor",
       {
-        diameter: diameter,
-        segments: 12
+        diameter: 2,
+        segments: 8
       },
       scene
     );
 
 
+  // ===================================
+  // MAKE METEOR IRREGULAR
+  // ===================================
+
+  const positions =
+    meteor.getVerticesData(
+      VertexBuffer.PositionKind
+    );
+
+
+  for (
+    let i = 0;
+    i < positions.length;
+    i += 3
+  ) {
+
+    const x =
+      positions[i];
+
+    const y =
+      positions[i + 1];
+
+    const z =
+      positions[i + 2];
+
+
+    const distance =
+      Math.sqrt(
+        x * x +
+        y * y +
+        z * z
+      );
+
+
+    const deformation =
+      0.75 +
+      Math.random() * 0.5;
+
+
+    const scale =
+      deformation / distance;
+
+
+    positions[i] *= scale;
+
+    positions[i + 1] *= scale;
+
+    positions[i + 2] *= scale;
+  }
+
+
+  meteor.setVerticesData(
+    VertexBuffer.PositionKind,
+    positions
+  );
+
+  meteor.refreshBoundingInfo();
+
+
+  // ===================================
+  // APPLY SIZE
+  // ===================================
+
+  meteor.scaling =
+    new Vector3(
+      diameter / 2,
+      diameter / 2,
+      diameter / 2
+    );
+
+
+  // ===================================
+  // MATERIAL
+  // ===================================
+
   meteor.material =
     meteorMaterial;
 
 
+  // ===================================
   // POSITION
+  // ===================================
+
   meteor.position =
     position.clone();
 
 
+  // ===================================
   // STORE SIZE
+  // ===================================
+
   meteor.size =
     size;
 
 
-  // STORE RADIUS
+  // ===================================
+  // COLLISION RADIUS
+  // ===================================
+
   meteor.radius =
     diameter / 2;
 
+
+  // ===================================
   // VELOCITY
+  // ===================================
 
   if (velocity) {
 
@@ -280,7 +603,6 @@ function createMeteor(
       velocity.clone();
 
   }
-
   else {
 
     const direction =
@@ -305,7 +627,10 @@ function createMeteor(
   }
 
 
+  // ===================================
   // ADD TO ARRAY
+  // ===================================
+
   meteors.push(
     meteor
   );
@@ -314,7 +639,10 @@ function createMeteor(
   return meteor;
 }
 
+
+// ===================================
 // CREATE INITIAL RANDOM METEORS
+// ===================================
 
 for (
   let i = 0;
@@ -344,11 +672,11 @@ for (
     position.length() >
       arenaRadius - 3 ||
 
-    position.length() < 10
+    position.length() <
+      10
   );
 
 
-  // Randomly choose a size
   const randomNumber =
     Math.random();
 
@@ -378,11 +706,20 @@ for (
   );
 }
 
+
+// ===================================
 // DESTROY / SPLIT METEOR
+// ===================================
 
 function destroyMeteor(
   meteor
 ) {
+
+    if (splitSoundTimer <= 0) {
+    splitSound.currentTime = 0;
+    splitSound.play();
+    splitSoundTimer = splitSoundCooldown;
+    }
 
   const position =
     meteor.position.clone();
@@ -391,14 +728,12 @@ function destroyMeteor(
     meteor.velocity.clone();
 
 
-  // FIND METEOR
   const index =
     meteors.indexOf(
       meteor
     );
 
 
-  // REMOVE FROM ARRAY
   if (index !== -1) {
 
     meteors.splice(
@@ -408,10 +743,12 @@ function destroyMeteor(
   }
 
 
-  // REMOVE FROM SCENE
   meteor.dispose();
 
+
+  // ===================================
   // BIG → 2 MEDIUM
+  // ===================================
 
   if (
     meteor.size === "big"
@@ -433,9 +770,20 @@ function destroyMeteor(
       ).normalize();
 
 
+    const position1 =
+      position.add(
+        direction1.scale(1)
+      );
+
+    const position2 =
+      position.add(
+        direction2.scale(1)
+      );
+
+
     createMeteor(
       "medium",
-      position,
+      position1,
       velocity.add(
         direction1.scale(2)
       )
@@ -444,14 +792,17 @@ function destroyMeteor(
 
     createMeteor(
       "medium",
-      position,
+      position2,
       velocity.add(
         direction2.scale(2)
       )
     );
   }
 
+
+  // ===================================
   // MEDIUM → 2 SMALL
+  // ===================================
 
   else if (
     meteor.size === "medium"
@@ -473,9 +824,20 @@ function destroyMeteor(
       ).normalize();
 
 
+    const position1 =
+      position.add(
+        direction1.scale(0.7)
+      );
+
+    const position2 =
+      position.add(
+        direction2.scale(0.7)
+      );
+
+
     createMeteor(
       "small",
-      position,
+      position1,
       velocity.add(
         direction1.scale(2)
       )
@@ -484,7 +846,7 @@ function destroyMeteor(
 
     createMeteor(
       "small",
-      position,
+      position2,
       velocity.add(
         direction2.scale(2)
       )
@@ -492,12 +854,89 @@ function destroyMeteor(
   }
 
 
-  // SMALL → NOTHING
+  // ===================================
+  // CHECK FOR WIN
+  // ===================================
+
+  if (meteors.length === 0) {
+
+    winSound.currentTime = 0;
+    winSound.play();
+    playerWon = true;
+    gameOver = true;
+
+    youWinText.isVisible =
+      true;
+
+    camera.detachControl(
+      canvas
+    );
+
+    if (
+      document.pointerLockElement ===
+      canvas
+    ) {
+
+      document.exitPointerLock();
+
+    }
+
+    console.log(
+      "YOU WIN!"
+    );
+  }
 }
 
+
+// ===================================
 // SHOOT
+// ===================================
+const bulletMaterial =
+  new StandardMaterial(
+    "bulletMaterial",
+    scene
+  );
+
+bulletMaterial.diffuseColor =
+  new Color3(1, 0, 0);
+
+bulletMaterial.emissiveColor =
+  new Color3(1, 0, 0);
+
+bulletMaterial.disableLighting = true;
 
 function shoot() {
+
+  if (gameOver) {
+    return;
+  }
+
+
+  // Maximum bullets
+  if (
+    bullets.length >=
+    maxBullets
+  ) {
+
+    return;
+  }
+
+
+  // Shooting cooldown
+  if (
+    shootTimer > 0
+  ) {
+
+    return;
+  }
+
+
+  shootSound.currentTime = 0;
+  shootSound.play();
+  shootTimer = shootCooldown;
+  // ===================================
+  // SHOOT DIRECTION
+  // ===================================
 
   const direction =
     camera
@@ -507,7 +946,10 @@ function shoot() {
       .normalize();
 
 
+  // ===================================
   // CREATE BULLET
+  // ===================================
+
   const bullet =
     MeshBuilder.CreateCylinder(
       "bullet",
@@ -520,54 +962,35 @@ function shoot() {
     );
 
 
-  // START IN FRONT OF PLAYER
+  // ===================================
+  // BULLET POSITION
+  // ===================================
+
   bullet.position =
     camera.position.add(
       direction.scale(2)
     );
 
 
+  // ===================================
   // POINT BULLET FORWARD
+  // ===================================
+
   bullet.alignWithNormal(
     direction
   );
 
 
+  // ===================================
   // BULLET MATERIAL
+  // ===================================
 
-  const material =
-    new StandardMaterial(
-      "bulletMaterial",
-      scene
-    );
+  bullet.material = bulletMaterial;
 
 
-  material.diffuseColor =
-    new Color3(
-      1,
-      0,
-      0
-    );
-
-
-  material.emissiveColor =
-    new Color3(
-      1,
-      0,
-      0
-    );
-
-    // Don't let lighting change the bullet's color
-  material.disableLighting = true;
-
-  bullet.material = material;
-
-
-  bullet.material =
-    material;
-
-
+  // ===================================
   // BULLET VARIABLES
+  // ===================================
 
   bullet.direction =
     direction;
@@ -576,17 +999,28 @@ function shoot() {
     bulletLifetime;
 
 
+  // ===================================
   // ADD BULLET
+  // ===================================
+
   bullets.push(
     bullet
   );
 }
 
+
+// ===================================
 // CLICK TO SHOOT
+// ===================================
 
 canvas.addEventListener(
   "click",
   () => {
+
+    if (gameOver) {
+      return;
+    }
+
 
     if (
       document.pointerLockElement !==
@@ -594,6 +1028,7 @@ canvas.addEventListener(
     ) {
 
       canvas.requestPointerLock();
+
     }
 
 
@@ -602,16 +1037,244 @@ canvas.addEventListener(
 );
 
 
+// ===================================
+// RESET GAME
+// ===================================
+
+function resetGame() {
+
+  if (!gameOver) {
+    return;
+  }
+
+
+  // ===================================
+  // REMOVE ALL METEORS
+  // ===================================
+
+  while (
+    meteors.length > 0
+  ) {
+
+    const meteor =
+      meteors.pop();
+
+    meteor.dispose();
+  }
+
+
+  // ===================================
+  // REMOVE ALL BULLETS
+  // ===================================
+
+  while (
+    bullets.length > 0
+  ) {
+
+    const bullet =
+      bullets.pop();
+
+    bullet.dispose();
+  }
+
+
+  // ===================================
+  // RESET PLAYER
+  // ===================================
+
+  playerHealth =
+    maxHealth;
+
+  damageTimer =
+    0;
+
+  shootTimer =
+    0;
+
+  updateHealthBar();
+
+
+  // ===================================
+  // RESET GAME STATE
+  // ===================================
+
+  gameOver =
+    false;
+
+  playerWon =
+    false;
+
+
+  gameOverText.isVisible =
+    false;
+
+  youWinText.isVisible =
+    false;
+
+
+  // ===================================
+  // RECONNECT CAMERA
+  // ===================================
+
+  camera.attachControl(
+    canvas,
+    true
+  );
+
+
+  // ===================================
+  // CREATE NEW METEORS
+  // ===================================
+
+  for (
+    let i = 0;
+    i < meteorCount;
+    i++
+  ) {
+
+    let position;
+
+
+    do {
+
+      position =
+        new Vector3(
+          (Math.random() * 2 - 1)
+            * arenaRadius,
+
+          (Math.random() * 2 - 1)
+            * arenaRadius,
+
+          (Math.random() * 2 - 1)
+            * arenaRadius
+        );
+
+    }
+    while (
+      position.length() >
+        arenaRadius - 3 ||
+
+      position.length() <
+        10
+    );
+
+
+    const randomNumber =
+      Math.random();
+
+    let size;
+
+
+    if (
+      randomNumber < 0.33
+    ) {
+
+      size = "small";
+
+    }
+    else if (
+      randomNumber < 0.66
+    ) {
+
+      size = "medium";
+
+    }
+    else {
+
+      size = "big";
+
+    }
+
+
+    createMeteor(
+      size,
+      position
+    );
+  }
+
+
+  console.log(
+    "GAME RESET"
+  );
+}
+
+
+// ===================================
+// R KEY = RETRY
+// ===================================
+
+window.addEventListener(
+  "keydown",
+  (event) => {
+
+    if (
+      event.key.toLowerCase() === "r" &&
+      gameOver
+    ) {
+
+      resetGame();
+
+    }
+  }
+);
+
+
+// ===================================
 // MAIN UPDATE LOOP
+// ===================================
 
 scene.onBeforeRenderObservable.add(
   () => {
+
+    // Stop game logic when game is over
+    if (gameOver) {
+      return;
+    }
+
 
     const deltaTime =
       engine.getDeltaTime() /
       1000;
 
+
+    // ===================================
+    // DAMAGE COOLDOWN
+    // ===================================
+
+    if (
+      damageTimer > 0
+    ) {
+
+      damageTimer -=
+        deltaTime;
+    }
+
+    if (reboundSoundTimer > 0) {
+      reboundSoundTimer -= deltaTime;
+    }
+
+
+    // ===================================
+    // SHOOT COOLDOWN
+    // ===================================
+
+    if (
+      shootTimer > 0
+    ) {
+
+      shootTimer -=
+        deltaTime;
+    }
+
+    if (splitSoundTimer > 0) {
+      splitSoundTimer -= deltaTime;
+    }
+
+
+
+    // ===================================
     // BULLETS
+    // ===================================
 
     for (
       let i = bullets.length - 1;
@@ -624,6 +1287,7 @@ scene.onBeforeRenderObservable.add(
 
 
       // MOVE BULLET
+
       bullet.position.addInPlace(
         bullet.direction.scale(
           bulletSpeed *
@@ -633,10 +1297,14 @@ scene.onBeforeRenderObservable.add(
 
 
       // REDUCE LIFETIME
+
       bullet.life -=
         deltaTime;
 
+
+      // ===================================
       // BULLET → METEOR COLLISION
+      // ===================================
 
       for (
         let j = meteors.length - 1;
@@ -660,13 +1328,11 @@ scene.onBeforeRenderObservable.add(
           meteor.radius + 0.15
         ) {
 
-          // SPLIT / DESTROY METEOR
           destroyMeteor(
             meteor
           );
 
 
-          // DESTROY BULLET
           bullet.dispose();
 
 
@@ -676,12 +1342,14 @@ scene.onBeforeRenderObservable.add(
           );
 
 
-          // Stop checking this bullet
           break;
         }
       }
 
+
+      // ===================================
       // BULLET LIFETIME
+      // ===================================
 
       if (
         bullet.life <= 0 &&
@@ -700,24 +1368,32 @@ scene.onBeforeRenderObservable.add(
       }
     }
 
+
+    // ===================================
     // METEORS
+    // ===================================
 
     for (
       const meteor of meteors
     ) {
 
+      // ===================================
       // MOVE METEOR
+      // ===================================
+
       meteor.position.addInPlace(
         meteor.velocity.scale(
           deltaTime
         )
       );
 
-      // CHECK ARENA WALL
+
+      // ===================================
+      // METEOR → ARENA WALL
+      // ===================================
 
       const distance =
         meteor.position.length();
-
 
       const maxDistance =
         arenaRadius -
@@ -733,35 +1409,329 @@ scene.onBeforeRenderObservable.add(
           meteor.position.normalize();
 
 
-        // Only bounce if moving
-        // toward the wall
+        // Only bounce if moving toward wall
+
         if (
           Vector3.Dot(
             meteor.velocity,
             normal
           ) > 0
         ) {
-
+          if (reboundSoundTimer <= 0) {
+            reboundSound.currentTime = 0;
+            reboundSound.play();
+            reboundSoundTimer = reboundSoundCooldown;
+          }
+          // Bounce off the wall
           meteor.velocity =
             Vector3.Reflect(
               meteor.velocity,
               normal
             );
+        
+          // Speed up by 10% after hitting the wall
+          meteor.velocity =
+            meteor.velocity.scale(1.1);
+        
+          // Maximum meteor speed
+          const maxMeteorSpeed = 12;
+        
+          if (
+            meteor.velocity.length() >
+            maxMeteorSpeed
+          ) {
+        
+            meteor.velocity =
+              meteor.velocity.normalize().scale(
+                maxMeteorSpeed
+              );
+          }
         }
 
 
         // Keep meteor inside arena
+
         meteor.position =
           normal.scale(
             maxDistance
           );
+      }
+
+
+      // ===================================
+      // METEOR → PLAYER
+      // ===================================
+
+      const distanceToPlayer =
+        Vector3.Distance(
+          meteor.position,
+          camera.position
+        );
+
+
+      const playerCollisionDistance =
+        meteor.radius + 1.2;
+
+
+      if (
+        damageTimer <= 0 &&
+        distanceToPlayer <
+        playerCollisionDistance
+      ) {
+
+        let damage;
+
+
+        if (
+          meteor.size === "big"
+        ) {
+
+          damage = 40;
+
+        }
+        else if (
+          meteor.size === "medium"
+        ) {
+
+          damage = 20;
+
+        }
+        else {
+
+          damage = 10;
+
+        }
+
+
+        playerHealth -=
+          damage;
+
+
+        playerHealth =
+          Math.max(
+            0,
+            playerHealth
+          );
+
+
+        updateHealthBar();
+        hitSound.currentTime = 0;
+        hitSound.play();
+
+        damageTimer =
+          damageCooldown;
+
+
+        // ===================================
+        // PUSH METEOR AWAY
+        // ===================================
+
+        const pushDirection =
+          meteor.position.subtract(
+            camera.position
+          );
+
+
+        if (
+          pushDirection.lengthSquared() >
+          0
+        ) {
+
+          pushDirection.normalize();
+
+
+          meteor.position =
+            camera.position.add(
+              pushDirection.scale(
+                meteor.radius + 1.5
+              )
+            );
+        }
+
+
+        // ===================================
+        // GAME OVER
+        // ===================================
+
+        if (
+          playerHealth <= 0
+        ) {
+
+          loseSound.currentTime = 0;
+          loseSound.play();
+          gameOver =
+            true;
+
+          playerWon =
+            false;
+
+          gameOverText.isVisible =
+            true;
+
+
+          camera.detachControl(
+            canvas
+          );
+
+
+          if (
+            document.pointerLockElement ===
+            canvas
+          ) {
+
+            document.exitPointerLock();
+
+          }
+
+
+          console.log(
+            "GAME OVER"
+          );
+
+
+          return;
+        }
+      }
+    }
+
+
+    // ===================================
+    // METEOR → METEOR COLLISIONS
+    // ===================================
+
+    for (
+      let i = 0;
+      i < meteors.length;
+      i++
+    ) {
+
+      for (
+        let j = i + 1;
+        j < meteors.length;
+        j++
+      ) {
+
+        
+
+        const meteorA =
+          meteors[i];
+
+        const meteorB =
+          meteors[j];
+
+
+        // Direction from A to B
+
+        const difference =
+          meteorB.position.subtract(
+            meteorA.position
+          );
+
+
+        const distance =
+          difference.length();
+
+
+        const minimumDistance =
+          meteorA.radius +
+          meteorB.radius;
+
+
+        // Check if touching
+
+        if (
+          distance <
+          minimumDistance &&
+          distance > 0
+        ) {
+
+          const normal =
+            difference.normalize();
+
+
+          // Relative velocity
+
+          const relativeVelocity =
+            meteorB.velocity.subtract(
+              meteorA.velocity
+            );
+
+
+          const velocityAlongNormal =
+            Vector3.Dot(
+              relativeVelocity,
+              normal
+            );
+
+
+          // Only bounce if moving
+          // toward each other
+
+          // Only bounce if moving
+          // toward each other
+
+          if (
+            velocityAlongNormal < 0
+          ) {
+
+            // Play rebound sound with cooldown
+
+            if (reboundSoundTimer <= 0) {
+              reboundSound.currentTime = 0;
+              reboundSound.play();
+              reboundSoundTimer = reboundSoundCooldown;
+            }
+
+            // Equal-mass elastic collision
+
+            meteorA.velocity =
+              meteorA.velocity.add(
+                normal.scale(
+                  velocityAlongNormal
+                )
+              );
+
+              meteorB.velocity =
+              meteorB.velocity.subtract(
+                normal.scale(
+                velocityAlongNormal
+                )
+              );
+            }
+
+
+          // ===================================
+          // SEPARATE METEORS
+          // ===================================
+
+          const overlap =
+            minimumDistance -
+            distance;
+
+
+          const separation =
+            normal.scale(
+              overlap / 2 + 0.01
+            );
+
+
+          meteorA.position.subtractInPlace(
+            separation
+          );
+
+          meteorB.position.addInPlace(
+            separation
+          );
+        }
       }
     }
   }
 );
 
 
+// ===================================
 // RENDER LOOP
+// ===================================
 
 engine.runRenderLoop(
   () => {
@@ -771,7 +1741,10 @@ engine.runRenderLoop(
   }
 );
 
+
+// ===================================
 // WINDOW RESIZE
+// ===================================
 
 window.addEventListener(
   "resize",
