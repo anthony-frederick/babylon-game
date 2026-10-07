@@ -249,7 +249,7 @@ loseSound.volume = 0.5;
 const splitSound = new Audio("sounds/split.wav");
 splitSound.volume = 0.5;
 const winSound = new Audio("sounds/win.wav");
-winSound.volume = 0.5;
+winSound.volume = 1;
 const reboundSound = new Audio("sounds/rebound.mp3");
 reboundSound.volume = 0.5;
 
