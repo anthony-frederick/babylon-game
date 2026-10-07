@@ -1469,7 +1469,7 @@ const distanceToPlayer =
   );
 
 const playerCollisionDistance =
-  meteor.radius + 2;
+  meteor.radius + 4;
 
 
 // ===================================
