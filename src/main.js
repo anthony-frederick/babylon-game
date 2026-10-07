@@ -394,7 +394,7 @@ window.addEventListener(
 
 // BULLET SETTINGS
 
-const bulletSpeed = 40;
+const bulletSpeed = 90;
 
 const bulletLifetime = 2;
 
