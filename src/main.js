@@ -1458,294 +1458,174 @@ scene.onBeforeRenderObservable.add(
       }
 
 
-      // ===================================
-      // METEOR → PLAYER
-      // ===================================
+// ===================================
+// METEOR → PLAYER
+// ===================================
 
-      const distanceToPlayer =
-        Vector3.Distance(
-          meteor.position,
-          camera.position
+const distanceToPlayer =
+  Vector3.Distance(
+    meteor.position,
+    camera.position
+  );
+
+const playerCollisionDistance =
+  meteor.radius + 2;
+
+
+// ===================================
+// PLAYER COLLISION
+// ===================================
+
+if (
+  distanceToPlayer <
+  playerCollisionDistance
+) {
+
+  // ===================================
+  // BOUNCE METEOR OFF PLAYER
+  // ===================================
+
+  const bounceNormal =
+    meteor.position.subtract(
+      camera.position
+    );
+
+  if (
+    bounceNormal.lengthSquared() > 0
+  ) {
+
+    bounceNormal.normalize();
+
+    // Move meteor outside the player
+    meteor.position =
+      camera.position.add(
+        bounceNormal.scale(
+          meteor.radius + 1.5
+        )
+      );
+
+    // Calculate how much the meteor is
+    // moving toward the player
+    const velocityIntoPlayer =
+      Vector3.Dot(
+        meteor.velocity,
+        bounceNormal
+      );
+
+    // Only reflect velocity if it is
+    // actually moving toward the player
+    if (
+      velocityIntoPlayer < 0
+    ) {
+
+      meteor.velocity =
+        meteor.velocity.subtract(
+          bounceNormal.scale(
+            2 * velocityIntoPlayer
+          )
         );
+    }
+  }
 
 
-      const playerCollisionDistance =
-        meteor.radius + 1.2;
+  // ===================================
+  // DAMAGE PLAYER
+  // ===================================
+
+  if (
+    damageTimer <= 0
+  ) {
+
+    let damage;
+
+    if (
+      meteor.size === "big"
+    ) {
+
+      damage = 40;
+
+    }
+    else if (
+      meteor.size === "medium"
+    ) {
+
+      damage = 20;
+
+    }
+    else {
+
+      damage = 10;
+
+    }
+
+
+    playerHealth -=
+      damage;
+
+    playerHealth =
+      Math.max(
+        0,
+        playerHealth
+      );
+
+
+    updateHealthBar();
+
+    hitSound.currentTime = 0;
+    hitSound.play();
+
+    damageTimer =
+      damageCooldown;
+
+
+    // ===================================
+    // GAME OVER
+    // ===================================
+
+    if (
+      playerHealth <= 0
+    ) {
+
+      loseSound.currentTime = 0;
+      loseSound.play();
+
+      gameOver =
+        true;
+
+      playerWon =
+        false;
+
+      gameOverText.isVisible =
+        true;
+
+
+      camera.detachControl(
+        canvas
+      );
 
 
       if (
-        damageTimer <= 0 &&
-        distanceToPlayer <
-        playerCollisionDistance
+        document.pointerLockElement ===
+        canvas
       ) {
 
-        let damage;
+        document.exitPointerLock();
 
-
-        if (
-          meteor.size === "big"
-        ) {
-
-          damage = 40;
-
-        }
-        else if (
-          meteor.size === "medium"
-        ) {
-
-          damage = 20;
-
-        }
-        else {
-
-          damage = 10;
-
-        }
-
-
-        playerHealth -=
-          damage;
-
-
-        playerHealth =
-          Math.max(
-            0,
-            playerHealth
-          );
-
-
-        updateHealthBar();
-        hitSound.currentTime = 0;
-        hitSound.play();
-
-        damageTimer =
-          damageCooldown;
-
-
-        // ===================================
-        // BOUNCE METEOR OFF PLAYER
-        // ===================================
-
-        const bounceNormal =
-        meteor.position.subtract(
-          camera.position
-        );
-
-        if (
-        bounceNormal.lengthSquared() > 0
-        ) {
-
-        // Direction from player to meteor
-        bounceNormal.normalize();
-
-        // Move meteor outside the player
-        meteor.position =
-          camera.position.add(
-            bounceNormal.scale(
-              meteor.radius + 1.5
-            )
-          );
-
-        // Reflect meteor velocity off the player
-        const velocityIntoPlayer =
-          Vector3.Dot(
-            meteor.velocity,
-            bounceNormal
-          );
-
-        // Only bounce if the meteor is moving toward the player
-        if (
-          velocityIntoPlayer < 0
-        ) {
-
-          meteor.velocity =
-            meteor.velocity.subtract(
-              bounceNormal.scale(
-                2 * velocityIntoPlayer
-              )
-            );
-        }
-        }
-
-
-        // ===================================
-        // GAME OVER
-        // ===================================
-
-        if (
-          playerHealth <= 0
-        ) {
-
-          loseSound.currentTime = 0;
-          loseSound.play();
-          gameOver =
-            true;
-
-          playerWon =
-            false;
-
-          gameOverText.isVisible =
-            true;
-
-
-          camera.detachControl(
-            canvas
-          );
-
-
-          if (
-            document.pointerLockElement ===
-            canvas
-          ) {
-
-            document.exitPointerLock();
-
-          }
-
-
-          console.log(
-            "GAME OVER"
-          );
-
-
-          return;
-        }
       }
-    }
 
 
-    // ===================================
-    // METEOR → METEOR COLLISIONS
-    // ===================================
+      console.log(
+        "GAME OVER"
+      );
 
-    for (
-      let i = 0;
-      i < meteors.length;
-      i++
-    ) {
-
-      for (
-        let j = i + 1;
-        j < meteors.length;
-        j++
-      ) {
-
-        
-
-        const meteorA =
-          meteors[i];
-
-        const meteorB =
-          meteors[j];
-
-
-        // Direction from A to B
-
-        const difference =
-          meteorB.position.subtract(
-            meteorA.position
-          );
-
-
-        const distance =
-          difference.length();
-
-
-        const minimumDistance =
-          meteorA.radius +
-          meteorB.radius;
-
-
-        // Check if touching
-
-        if (
-          distance <
-          minimumDistance &&
-          distance > 0
-        ) {
-
-          const normal =
-            difference.normalize();
-
-
-          // Relative velocity
-
-          const relativeVelocity =
-            meteorB.velocity.subtract(
-              meteorA.velocity
-            );
-
-
-          const velocityAlongNormal =
-            Vector3.Dot(
-              relativeVelocity,
-              normal
-            );
-
-
-          // Only bounce if moving
-          // toward each other
-
-          // Only bounce if moving
-          // toward each other
-
-          if (
-            velocityAlongNormal < 0
-          ) {
-
-            // Play rebound sound with cooldown
-
-            if (reboundSoundTimer <= 0) {
-              reboundSound.currentTime = 0;
-              reboundSound.play();
-              reboundSoundTimer = reboundSoundCooldown;
-            }
-
-            // Equal-mass elastic collision
-
-            meteorA.velocity =
-              meteorA.velocity.add(
-                normal.scale(
-                  velocityAlongNormal
-                )
-              );
-
-              meteorB.velocity =
-              meteorB.velocity.subtract(
-                normal.scale(
-                velocityAlongNormal
-                )
-              );
-            }
-
-
-          // ===================================
-          // SEPARATE METEORS
-          // ===================================
-
-          const overlap =
-            minimumDistance -
-            distance;
-
-
-          const separation =
-            normal.scale(
-              overlap / 2 + 0.01
-            );
-
-
-          meteorA.position.subtractInPlace(
-            separation
-          );
-
-          meteorB.position.addInPlace(
-            separation
-          );
-        }
-      }
+      return;
     }
   }
-);
+}
+
+    }
+
+  });
 
 
 // ===================================
