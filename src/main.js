@@ -1523,29 +1523,48 @@ scene.onBeforeRenderObservable.add(
 
 
         // ===================================
-        // PUSH METEOR AWAY
+        // BOUNCE METEOR OFF PLAYER
         // ===================================
 
-        const pushDirection =
-          meteor.position.subtract(
-            camera.position
-          );
-
+        const bounceNormal =
+        meteor.position.subtract(
+          camera.position
+        );
 
         if (
-          pushDirection.lengthSquared() >
-          0
+        bounceNormal.lengthSquared() > 0
         ) {
 
-          pushDirection.normalize();
+        // Direction from player to meteor
+        bounceNormal.normalize();
 
+        // Move meteor outside the player
+        meteor.position =
+          camera.position.add(
+            bounceNormal.scale(
+              meteor.radius + 1.5
+            )
+          );
 
-          meteor.position =
-            camera.position.add(
-              pushDirection.scale(
-                meteor.radius + 1.5
+        // Reflect meteor velocity off the player
+        const velocityIntoPlayer =
+          Vector3.Dot(
+            meteor.velocity,
+            bounceNormal
+          );
+
+        // Only bounce if the meteor is moving toward the player
+        if (
+          velocityIntoPlayer < 0
+        ) {
+
+          meteor.velocity =
+            meteor.velocity.subtract(
+              bounceNormal.scale(
+                2 * velocityIntoPlayer
               )
             );
+        }
         }
 
 
